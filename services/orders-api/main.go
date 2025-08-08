@@ -55,11 +55,20 @@ func main() {
 
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 
-	http.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
+    http.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
+        // CORS for local dev
+        if r.Method == http.MethodOptions {
+            w.Header().Set("Access-Control-Allow-Origin", "*")
+            w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+            w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+            w.WriteHeader(http.StatusNoContent)
+            return
+        }
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        if r.Method != http.MethodPost {
+            w.WriteHeader(http.StatusMethodNotAllowed)
+            return
+        }
 		var req CreateOrderRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
