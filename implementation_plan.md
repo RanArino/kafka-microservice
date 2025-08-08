@@ -22,7 +22,7 @@ This guide is a practical, end‑to‑end plan for building and demonstrating Ka
 
 ## 1) Repository layout plan
 
-- [ ] Create the following structure as you go:
+- [x] Create the following structure as you go:
 
 ```
 kafka-microservice/
@@ -77,7 +77,7 @@ Add a simple diagram in the blog to show producer → topic partitions → consu
 
 ## 4) Infrastructure: Docker Compose (Kafka 3.9.x + ZooKeeper)
 
-- [ ] Add `docker-compose.yml` with:
+- [x] Add `docker-compose.yml` with:
   - ZooKeeper using `bitnami/zookeeper:3.9`
   - Kafka 3.9.x using `bitnami/kafka:3.9` configured to connect to ZooKeeper
   - Kafka UI using `provectuslabs/kafka-ui`
