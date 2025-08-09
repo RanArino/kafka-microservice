@@ -47,16 +47,16 @@ kafka-microservice/
 
 ## 2) Architecture and event flow (high‑level)
 
-- [ ] Domain: Orders
+- [x] Domain: Orders
   - `orders-api` accepts HTTP POST `/orders` with order data, produces `orders.created` event
   - `orders-processor` consumes `orders.created`, “processes” it (simulate payment), produces `orders.status` events
   - `notifications-api` consumes `orders.status` and pushes live updates to web clients via SSE (or WebSocket)
   - `stock-service` consumes `orders.created`, decrements inventory per item, and produces `inventory.updated` events
-- [ ] Topics
+- [x] Topics
   - `orders.created` (key: orderId, value: OrderCreated JSON)
   - `orders.status` (key: orderId, value: OrderStatus JSON)
   - `inventory.updated` (key: sku, value: InventoryUpdated JSON)
-- [ ] Consumer groups
+- [x] Consumer groups
   - `orders-processor-cg`: processes new orders
   - `notifications-api-cg`: tails statuses for push to clients
   - `stock-service-cg`: updates inventory on orders
@@ -81,53 +81,8 @@ Add a simple diagram in the blog to show producer → topic partitions → consu
   - ZooKeeper using `bitnami/zookeeper:3.9`
   - Kafka 3.9.x using `bitnami/kafka:3.9` configured to connect to ZooKeeper
   - Kafka UI using `provectuslabs/kafka-ui`
-
-Example (ZooKeeper + Kafka 3.9) snippet to place in `docker-compose.yml`:
-
-```yaml
-services:
-  zookeeper:
-    image: bitnami/zookeeper:3.9
-    container_name: zookeeper
-    environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-    ports:
-      - "2181:2181"
-
-  kafka:
-    image: bitnami/kafka:3.9
-    container_name: kafka
-    ports:
-      - "9093:9093"   # external listener for host
-    environment:
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT
-      - KAFKA_CFG_LISTENERS=PLAINTEXT_INTERNAL://:9092,PLAINTEXT_EXTERNAL://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT_INTERNAL://kafka:9092,PLAINTEXT_EXTERNAL://localhost:9093
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT_INTERNAL
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
-    depends_on:
-      - zookeeper
-    healthcheck:
-      test: ["CMD", "bash", "-c", "/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | cat"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    ports:
-      - "8080:8080"
-    environment:
-      - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-    depends_on:
-      - kafka
-```
-
-- [ ] Start stack: `docker compose up -d`
-- [ ] Verify UI at `http://localhost:8080` (cluster should be healthy)
+- [x] Start stack: `docker compose up -d`
+- [x] Verify UI at `http://localhost:8080` (cluster should be healthy)
 
 ---
 
@@ -149,7 +104,7 @@ docker compose exec kafka kafka-topics.sh \
   --create --topic orders.status --partitions 3 --replication-factor 1
 ```
 
-- [ ] Define event JSON contracts (for blog + code):
+- [x] Define event JSON contracts (for blog + code):
 ```json
 // orders.created value
 {
@@ -184,18 +139,18 @@ docker compose exec kafka kafka-topics.sh \
 ## 6) Go services
 
 Common notes
-- [ ] Use module paths like `github.com/<you>/kafka-microservice/services/...`
-- [ ] Library choice: `github.com/segmentio/kafka-go` for clarity and low boilerplate
-- [ ] Config via env (optional, defaults applied if unset): `KAFKA_BROKERS=localhost:9093`
+- [x] Use module paths like `github.com/<you>/kafka-microservice/services/...`
+- [x] Library choice: `github.com/segmentio/kafka-go` for clarity and low boilerplate
+- [x] Config via env (optional, defaults applied if unset): `KAFKA_BROKERS=localhost:9093`
 - [ ] Graceful shutdown with context cancellation and consumer close
 
 ### 6.1) `orders-api` (producer)
-- [ ] Init module: `go mod init .../orders-api`
-- [ ] Add HTTP server (Gin or net/http) with routes:
-  - [ ] `POST /orders` → validate JSON → generate `orderId` → produce to `orders.created`
-  - [ ] `GET /healthz`
-- [ ] Add Kafka writer (per topic) with balanced partitioner on key `orderId`
-- [ ] Return `201 Created` with `orderId`
+- [x] Init module: `go mod init .../orders-api`
+- [x] Add HTTP server (Gin or net/http) with routes:
+  - [x] `POST /orders` → validate JSON → generate `orderId` → produce to `orders.created`
+  - [x] `GET /healthz`
+- [x] Add Kafka writer (per topic) with balanced partitioner on key `orderId`
+- [x] Return `201 Created` with `orderId`
 - [ ] Dockerfile and local run target
 
 Minimal writer example (for reference in code):
@@ -215,9 +170,9 @@ func newWriter(brokers []string, topic string) *kafka.Writer {
 ```
 
 ### 6.2) `orders-processor` (consumer + producer)
-- [ ] Init module: `go mod init .../orders-processor`
-- [ ] Kafka reader for `orders.created` with group `orders-processor-cg`
-- [ ] Simulate processing: sleep or simple rules; decide status → produce `orders.status`
+- [x] Init module: `go mod init .../orders-processor`
+- [x] Kafka reader for `orders.created` with group `orders-processor-cg`
+- [x] Simulate processing: sleep or simple rules; decide status → produce `orders.status`
 - [ ] Ensure retry/backoff on temporary errors; log and continue
 - [ ] Health endpoints if running as service
 
@@ -239,12 +194,12 @@ for {
 ```
 
 ### 6.3) `notifications-api` (consumer → SSE/WebSocket)
-- [ ] Init module: `go mod init .../notifications-api`
-- [ ] Kafka reader on `orders.status` with group `notifications-api-cg`
-- [ ] Maintain in‑memory map of clients subscribed by `orderId`
-- [ ] SSE endpoint: `GET /events?orderId=<id>` streams matching status updates
-- [ ] Broadcast status updates to all clients interested in the `orderId`
-- [ ] CORS enabled for local dev
+- [x] Init module: `go mod init .../notifications-api`
+- [x] Kafka reader on `orders.status` with group `notifications-api-cg`
+- [x] Maintain in‑memory map of clients subscribed by `orderId`
+- [x] SSE endpoint: `GET /events?orderId=<id>` streams matching status updates
+- [x] Broadcast status updates to all clients interested in the `orderId`
+- [x] CORS enabled for local dev
 
 SSE handler shape:
 ```go
@@ -259,13 +214,13 @@ func sse(w http.ResponseWriter, r *http.Request) {
 ---
 
 ### 6.4) `stock-service` (consumer + producer; optional SQLite + Ent)
-- [ ] Init module: `go mod init .../stock-service`
-- [ ] Kafka reader for `orders.created` with group `stock-service-cg`
-- [ ] Maintain inventory store (either in-memory map or SQLite via Ent)
-- [ ] For each order item, decrement stock and produce `inventory.updated` per item (key: `sku`)
-- [ ] Optional HTTP endpoints for debugging:
-  - [ ] `GET /stock` → returns current quantities by `sku`
-  - [ ] `POST /seed` → seed inventory for demo
+- [x] Init module: `go mod init .../stock-service`
+- [x] Kafka reader for `orders.created` with group `stock-service-cg`
+- [x] Maintain inventory store (either in-memory map or SQLite via Ent)
+- [x] For each order item, decrement stock and produce `inventory.updated` per item (key: `sku`)
+- [x] Optional HTTP endpoints for debugging:
+  - [x] `GET /stock` → returns current quantities by `sku`
+  - [x] `POST /seed` → seed inventory for demo
 
 Minimal processing outline:
 ```go

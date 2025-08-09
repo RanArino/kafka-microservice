@@ -61,12 +61,22 @@ func main() {
 	outTopic := getenv("INVENTORY_TOPIC", "inventory.updated")
 	group := getenv("GROUP_ID", "stock-service-cg")
 
-	http.HandleFunc("/stock", func(w http.ResponseWriter, r *http.Request) {
+    http.HandleFunc("/stock", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Access-Control-Allow-Origin", "*")
 		mu.RLock()
 		defer mu.RUnlock()
 		_ = json.NewEncoder(w).Encode(inventory)
 	})
-	http.HandleFunc("/seed", func(w http.ResponseWriter, r *http.Request) {
+    http.HandleFunc("/seed", func(w http.ResponseWriter, r *http.Request) {
+        // CORS for local dev
+        if r.Method == http.MethodOptions {
+            w.Header().Set("Access-Control-Allow-Origin", "*")
+            w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+            w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+            w.WriteHeader(http.StatusNoContent)
+            return
+        }
+        w.Header().Set("Access-Control-Allow-Origin", "*")
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return

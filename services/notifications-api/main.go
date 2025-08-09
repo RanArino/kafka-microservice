@@ -96,12 +96,21 @@ func main() {
 	}()
 
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
-	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+    http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+        // CORS for local dev
+        if r.Method == http.MethodOptions {
+            w.Header().Set("Access-Control-Allow-Origin", "*")
+            w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+            w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+            w.WriteHeader(http.StatusNoContent)
+            return
+        }
 		orderID := r.URL.Query().Get("orderId")
 		if orderID == "" {
 			http.Error(w, "orderId required", http.StatusBadRequest)
 			return
 		}
+        w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
