@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -84,21 +87,30 @@ func main() {
 	defer writer.Close()
 
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		// Check if Kafka writer is available by attempting a connection test
+		// Note: kafka-go doesn't expose connection status directly, so we assume ready if writer was created
+		if writer != nil {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	})
 
-    http.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
-        // CORS for local dev
-        if r.Method == http.MethodOptions {
-            w.Header().Set("Access-Control-Allow-Origin", "*")
-            w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-            w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-            w.WriteHeader(http.StatusNoContent)
-            return
-        }
-        w.Header().Set("Access-Control-Allow-Origin", "*")
-        if r.Method != http.MethodPost {
-            w.WriteHeader(http.StatusMethodNotAllowed)
-            return
-        }
+	http.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
+		// CORS for local dev
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 		var req CreateOrderRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -127,6 +139,35 @@ func main() {
 		_ = json.NewEncoder(w).Encode(map[string]string{"orderId": orderID})
 	})
 
-	log.Printf("orders-api listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	srv := &http.Server{Addr: addr}
+
+	// Start server in a goroutine
+	go func() {
+		log.Printf("orders-api listening on %s", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server failed: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down orders-api...")
+
+	// Close Kafka writer
+	if err := writer.Close(); err != nil {
+		log.Printf("error closing kafka writer: %v", err)
+	}
+
+	// Shutdown HTTP server with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("server forced to shutdown: %v", err)
+	}
+
+	log.Println("orders-api shutdown complete")
 }
