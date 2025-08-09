@@ -45,6 +45,36 @@ func newWriter(brokers []string, topic string) *kafka.Writer {
 	return &kafka.Writer{Addr: kafka.TCP(brokers...), Topic: topic, Balancer: &kafka.Hash{}}
 }
 
+func checkStockAvailability(items []OrderItem) error {
+	stockServiceURL := getenv("STOCK_SERVICE_URL", "http://localhost:8084")
+	
+	// Get current stock levels
+	resp, err := http.Get(stockServiceURL + "/stock")
+	if err != nil {
+		return fmt.Errorf("failed to check stock: %v", err)
+	}
+	defer resp.Body.Close()
+	
+	var stock map[string]int
+	if err := json.NewDecoder(resp.Body).Decode(&stock); err != nil {
+		return fmt.Errorf("failed to parse stock response: %v", err)
+	}
+	
+	// Check if we have enough stock for each item
+	for _, item := range items {
+		available, exists := stock[item.SKU]
+		if !exists {
+			return fmt.Errorf("product %s does not exist", item.SKU)
+		}
+		if available < item.Qty {
+			return fmt.Errorf("insufficient stock for %s: requested %d, available %d", 
+				item.SKU, item.Qty, available)
+		}
+	}
+	
+	return nil
+}
+
 func main() {
 	addr := getenv("HTTP_ADDR", ":8081")
 	brokers := strings.Split(getenv("KAFKA_BROKERS", "localhost:9093"), ",")
@@ -75,6 +105,15 @@ func main() {
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid json"})
 			return
 		}
+		
+		// Check stock availability before accepting the order
+		if err := checkStockAvailability(req.Items); err != nil {
+			log.Printf("stock validation failed: %v", err)
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		
 		orderID := uuid.NewString()
 		evt := OrderCreated{OrderID: orderID, UserID: req.UserID, Items: req.Items, Total: req.Total, Currency: req.Currency, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
 		payload, _ := json.Marshal(evt)
