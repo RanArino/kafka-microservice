@@ -1,4 +1,4 @@
-version: "3.8"
+
 services:
   zookeeper:
     image: bitnami/zookeeper:3.9
@@ -38,3 +38,105 @@ services:
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+
+  # Go Microservices
+  orders-api:
+    build:
+      context: ./services/orders-api
+    container_name: orders-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      - HTTP_ADDR=:8081
+      - KAFKA_BROKERS=kafka:9092
+      - ORDERS_TOPIC=orders.created
+      - STOCK_SERVICE_URL=http://stock-service:8084
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  orders-processor:
+    build:
+      context: ./services/orders-processor
+    container_name: orders-processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      - HTTP_ADDR=:8082
+      - KAFKA_BROKERS=kafka:9092
+      - ORDERS_TOPIC=orders.created
+      - STATUS_TOPIC=orders.status
+      - CONSUMER_GROUP=orders-processor-cg
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notifications-api:
+    build:
+      context: ./services/notifications-api
+    container_name: notifications-api
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      - HTTP_ADDR=:8083
+      - KAFKA_BROKERS=kafka:9092
+      - STATUS_TOPIC=orders.status
+      - CONSUMER_GROUP=notifications-api-cg
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  stock-service:
+    build:
+      context: ./services/stock-service
+    container_name: stock-service
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+    environment:
+      - HTTP_ADDR=:8084
+      - KAFKA_BROKERS=kafka:9092
+      - ORDERS_TOPIC=orders.created
+      - INVENTORY_TOPIC=inventory.updated
+      - CONSUMER_GROUP=stock-service-cg
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Frontend
+  frontend:
+    build:
+      context: ./my-app
+    container_name: frontend
+    depends_on:
+      - orders-api
+      - notifications-api
+      - stock-service
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
