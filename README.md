@@ -33,6 +33,11 @@ A real-time order processing system built with Go microservices, Apache Kafka ev
 
 ## 🚀 Quick Start
 
+There are two ways to start the applications:
+
+- Option A (recommended): All-in-one with Docker Compose — build and start everything at once
+- Option B: Manual per-service — start Kafka infra with Docker, then run each microservice/front-end locally
+
 ### Prerequisites
 - Docker & Docker Compose
 - Go ≥ 1.21
@@ -41,9 +46,21 @@ A real-time order processing system built with Go microservices, Apache Kafka ev
 
 ### 1. Start Kafka Infrastructure
 
+Option A — All-in-one (build & start everything):
+
 ```bash
-# Start ZooKeeper, Kafka, and Kafka UI
-docker compose up -d
+# One command to build and start all services
+./deploy.sh
+
+# or directly via Docker Compose
+docker compose up --build -d
+```
+
+Option B — Infra only (for manual per-service startup):
+
+```bash
+# Start only ZooKeeper, Kafka, and Kafka UI
+docker compose up -d zookeeper kafka kafka-ui
 
 # Verify Kafka is running
 docker compose ps
@@ -51,7 +68,7 @@ docker compose ps
 # Check Kafka UI at http://localhost:8080
 ```
 
-### 2. Start Backend Services
+### 2. Start Backend Services (used for Option B)
 
 Open 4 terminal windows and run each service:
 
@@ -73,7 +90,7 @@ make stock-service
 # or: cd services/stock-service && go run .
 ```
 
-### 3. Start Frontend
+### 3. Start Frontend (used for Option B)
 
 ```bash
 # Terminal 5: Next.js Frontend
